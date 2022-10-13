@@ -2,16 +2,13 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import pvlib as pv
-import seaborn as sns
 from pvlib.temperature import TEMPERATURE_MODEL_PARAMETERS as TMP
-from pvlib.temperature import sapm_cell_from_module as TMP_sandia
 from pvlib import pvsystem, modelchain, location
 import matplotlib
 matplotlib.use('Qt5Agg')
 
 # SAPM: Sandia PV Array Performance Model
 #%%
-
 def find_PV(Power, ef,type_cell): # type_cell = ['Mono-c-Si', 'Multi-c-Si', 'Thin Film', 'CdTe', 'CIGS']
     List_modules = pv.pvsystem.retrieve_sam('CECMod') # 모듈 및 인버터 목록 불러오기
     A_cec_List_modules_T = List_modules.T
@@ -24,7 +21,6 @@ def find_PV(Power, ef,type_cell): # type_cell = ['Mono-c-Si', 'Multi-c-Si', 'Thi
     module_parameters = List_modules[module_name]
     modules_per_string = PVArea // module_parameters['A_c']  # 스트링당 모듈개수
     return module_parameters, modules_per_string
-
 def find_inverter(module_parameters, strings, modules_per_string):  # type_cell = ['Mono-c-Si', 'Multi-c-Si', 'Thin Film', 'CdTe', 'CIGS']
     List_inverters = pv.pvsystem.retrieve_sam('CECInverter')
     inverter_capacity = modules_per_string * strings * module_parameters['STC']
@@ -35,14 +31,35 @@ def find_inverter(module_parameters, strings, modules_per_string):  # type_cell 
     inverter_name = filter_inverter[filter_inverter == True].index[0]
     inverter = List_inverters[inverter_name]  # 만약 특정 인버터를 선택한다면 'inverter_name'에 인버터 모델명 입력
     return inverter, inverter_capacity
-#%%
-#위치 및 시간정보 입력
+def PolarGraph(df_result,col_l,range_tilt,range_az,n_interval,  ):
+    ti, ri= np.meshgrid(np.linspace(0,2 * np.pi,len(range_az)), np.linspace(0,90,len(range_tilt)))
+    c_max = [df_result[i].max() for i in col_l]
+    c_min = [df_result[i].min() for i in col_l]
+    for i, col in zip(range(len(col_l)), col_l):
+        ir = df_result[col].to_numpy()
+        zi, z0 = np.reshape(ir, (len(range_az), len(range_tilt))).T, np.zeros((len(range_tilt), len(range_az)))
+        ax = plt.subplot(1, len(col_l), i + 1, polar=True)
+        cax_color_2 = ax.contourf(ti, ri, z0, cmap='Spectral_r', levels=np.linspace(c_min[i], c_max[i], n_interval))
+
+        cb = plt.colorbar(cax_color_2, orientation='vertical', shrink=0.5)
+        cb.set_label(col, labelpad=10, y=0.5, rotation=90)
+        ax.set_title(label=(col))
+        ax.set_theta_zero_location("N")
+        ax.set_theta_direction(-1)
+
+        ax.set_rticks([0, 30, 60, 90])
+        ax.set_rlabel_position(270)
+        ax.annotate("Altitude[°]", xy=[np.pi / 180 * 262, 60], rotation=0)
+        ax.set_yticks(np.linspace(0, 90, 4))
+        ax.set_xticks(np.linspace(0, np.pi * 2 / 12 * 11, 12))
+        ax.yaxis.grid(b=True, linestyle='--', color='k', linewidth=0.5)
+        ax.xaxis.grid(b=True, linestyle='--', color='k', linewidth=0.5)
+        plt.show()
+
+#%% 위치 및 기상조건 입력
 latitude, longitude = 36, 127                                                                 #위치정보: 위도, 경도
 timezone = 'Asia/Seoul'                                                                       #타임존
 times = pd.date_range('2019-01-01 06:00', '2019-01-04 18:00', freq='10min', tz=timezone)      #(시작시간, 종료시간, 시간간격)
-
-#%%
-# 기상조건 읽기
 source_ir, region_ir = 'KSES', 'DAEJEON'
 df_ir_all = pd.read_excel('df_ir_all.xlsx')
 df_ir = df_ir_all[(df_ir_all['Source']==source_ir) & (df_ir_all['region']==region_ir) ].reset_index(drop=True)
@@ -54,8 +71,8 @@ weather_KSES = df_weather[['ghi', 'dni', 'dhi', 'wind_speed','temp_air']]
 
 #%% PV 시뮬레이션 조건
 #설치정보('Noene'은 기본값)
-range_az =  np.linspace(0,360,19)
-range_tilt = np.linspace(0,90,10)
+range_az =  np.linspace(0,360,13)
+range_tilt = np.linspace(0,90,4)
 module_height, PVArea = 1, 10                                    #어레이 높이(m), 어레이 설치면적(㎡)
 # temperature_model_parameters = TMP['pvsyst']['freestanding']                #후면조건[개방: 'freestanding',부착: 'insulated']
 temperature_model_parameters = TMP['sapm']['open_rack_glass_polymer']          #후면조건[개방: 'freestanding',부착: 'insulated']
@@ -70,6 +87,7 @@ albedo = None                                                            #지면
 surface_type = None                                                      #지면 종류
 array_losses_parameters = None
 #%% 어레이 구성부
+
 arrays = []
 for a in range_az:
     for t in range_tilt:
@@ -130,6 +148,11 @@ for j in range(len(arrays)):
         'StartTime': [round(inverter_capacity / 1000, 2)],
     }
     df_result_sum = pd.concat([df_result_sum,pd.DataFrame(result_sum)])
+#%% 그래프
+col_l = ['AC[kWh]','Cell_Temperature']
+n_interval = 19
+PolarGraph(df_result_sum, col_l,range_tilt, range_az, n_interval)
+
 #%%
 df_close = pd.read_csv('./result/df_result_close_sandia.csv', index_col=0)
 df_open = pd.read_csv('./result/df_result_open_sandia.csv', index_col=0)
@@ -141,41 +164,4 @@ df_des = pd.DataFrame()
 for j in ['AC[kWh]','Cell_Temperature']:
     for i,n in zip([df_open, df_close],['Open','Close']):
         df_des[n+':'+j]=i[j].describe()
-#%% 그래프
-df_result_sum_f = df_result_sum
-r = df_result_sum_f['Tilt'].to_numpy()
-theta = np.radians(df_result_sum_f['Az'].to_numpy())
-ti, ri= np.meshgrid(np.linspace(0,2 * np.pi,len(range_az)), np.linspace(0,90,len(range_tilt)))
-c_max = [df_result_sum_f['AC[kWh]'].max(), df_result_sum_f['Cell_Temperature'].max()]
-c_min = [df_result_sum_f['AC[kWh]'].min(), df_result_sum_f['Cell_Temperature'].min()]
-n_interval = 19
-col_l = ['AC[kWh]','Cell_Temperature']
-fig, ax = plt.subplots()
-for i, col in zip(range(len(col_l)), col_l):
-    ir = df_result_sum_f[col].to_numpy()
-    zi, z0 = np.reshape(ir, (len(range_az), len(range_tilt))).T, np.zeros((len(range_tilt), len(range_az)))
-    zi_pt = zi
-    ax = plt.subplot(1, len(col_l), i + 1, polar=True)
-    cax_color_2 = ax.contourf(ti, ri, z0, cmap='Spectral_r', levels=np.linspace(c_min[i], c_max[i], n_interval))
-    cax_line = ax.contour(ti, ri, zi, levels=np.linspace(c_min[i], c_max[i], n_interval), linewidths=0.5, colors='k')
-    cax_color = ax.contourf(ti, ri, zi, cmap='Spectral_r', levels=np.linspace(c_min[i], c_max[i], n_interval))
-
-    cb = plt.colorbar(cax_color_2, orientation='vertical', shrink=0.5)
-    cb.set_label('Annual Solar Irradiation[kWh/m²yr]', labelpad=10, y=0.5, rotation=90)
-
-    # cb_pt = plt.colorbar(cax_color_3, orientation='vertical', shrink=0.75)
-    # cb_pt.set_label('[%]', labelpad=0, y=0.5, rotation=90)
-    ax.set_title(label=(col))
-    ax.set_theta_zero_location("N")
-    ax.set_theta_direction(-1)
-
-    ax.set_rticks([0, 30, 60, 90])
-    ax.set_rlabel_position(270)
-    ax.annotate("Altitude[°]", xy=[np.pi / 180 * 262, 60], rotation=0)
-
-    ax.set_yticks(np.linspace(0, 90, 4))
-    ax.set_xticks(np.linspace(0, np.pi * 2 / 12 * 11, 12))
-    ax.yaxis.grid(b=True, linestyle='--', color='k', linewidth=0.5)
-    ax.xaxis.grid(b=True, linestyle='--', color='k', linewidth=0.5)
-    plt.show()
 
