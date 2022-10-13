@@ -12,21 +12,20 @@ matplotlib.use('Qt5Agg')
 #%% 위치 및 시간정보 입력
 latitude, longitude = 36, 127
 timezone = 'Asia/Seoul'
-times = pd.date_range('2019-01-01 06:00', '2019-01-04 18:00', freq='10min', tz=timezone)
+times_s = pd.date_range('2019-01-01 01:00', '2020-01-01 00:00', freq='1H', tz=timezone)
 
 #%% 기상조건 읽기
-source_ir, region_ir = 'KSES', 'DAEJEON'
-df_ir_all = pd.read_excel('df_ir_all.xlsx')
-df_ir = df_ir_all[(df_ir_all['Source']==source_ir) & (df_ir_all['region']==region_ir) ].reset_index(drop=True)
+source_ir, region_ir = 'KSES', 'DAEJEON' # ['SEOUL', 'DAEJEON', 'BUSAN']
+df_ir_all = pd.read_excel('df_ir_all.xlsx', index_col=0)
+df_ir = df_ir_all[(df_ir_all['Source']==source_ir) & (df_ir_all['region']==region_ir)].reset_index(drop=True)
 df_weather = pd.concat([df_ir, pd.read_excel('KSES_weather.xlsx')], axis=1)
 
-times_s = pd.date_range('2019-01-01 01:00', '2020-01-01 00:00', freq='1H', tz=timezone)
 df_weather.index = times_s
 weather_KSES = df_weather[['ghi', 'dni', 'dhi', 'wind_speed','temp_air']]
 
 #%% PV 시뮬레이션 조건 ('Noene'은 기본값)
-range_az =  np.linspace(0,360,13)
-range_tilt = np.linspace(0,90,4)
+range_az =  np.linspace(0,360,37)
+range_tilt = np.linspace(0,90,10)
 module_height, PVArea = 1, 10
 temperature_model_parameters = TMP['sapm']['open_rack_glass_polymer']          #후면조건[개방: 'freestanding',부착: 'insulated']
 module_type = 'glass_glass'
@@ -57,7 +56,7 @@ for a in range_az:
 
 #%% Run(일사량의 경우 ClearSky모델에 의해 청천공 기준으로 계산됩니다)
 loc = location.Location(latitude, longitude)
-weather = loc.get_clearsky(times)
+weather = loc.get_clearsky(times_s)
 
 df_result = pd.DataFrame()
 result_pv_l = []
@@ -69,7 +68,7 @@ for j in range(len(arrays)):
     dict_result = {'name': [arrays[j].name], 'DC_sum': [result_pv.results.dc['p_mp'].sum()],
                    'Temp_Aver': [result_pv.results.cell_temperature.mean()]}
     df_result = pd.concat([df_result, pd.DataFrame(dict_result)])
-    print(round(j/len(arrays),2))
+    print(str(round(j/len(arrays)*100,2))+ '% Complete...')
 result_pv_ac = pd.concat([result_pv_l[i].results.ac for i in range(len(arrays))],
                          axis=1, ignore_index=True).apply(pd.to_numeric)
 result_pv_dc = pd.concat([result_pv_l[i].results.dc for i in range(len(arrays))],
