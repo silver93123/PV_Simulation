@@ -150,18 +150,18 @@ for j in range(len(arrays)):
     df_result_sum = pd.concat([df_result_sum,pd.DataFrame(result_sum)])
 #%% 그래프
 col_l = ['AC[kWh]','Cell_Temperature']
-n_interval = 19
+n_interval = 10
 PolarGraph(df_result_sum, col_l,range_tilt, range_az, n_interval)
 
-#%%
-df_close = pd.read_csv('./result/df_result_close_sandia.csv', index_col=0)
-df_open = pd.read_csv('./result/df_result_open_sandia.csv', index_col=0)
-df_delta = df_close[['AC[kWh]', 'Tilt', 'Az']]
-df_delta['AC[kWh]'] = df_open['AC[kWh]'] - df_close['AC[kWh]']
-df_delta['Cell_Temperature'] = df_close['Cell_Temperature'] - df_open['Cell_Temperature']
-#%% 그래프
-df_des = pd.DataFrame()
-for j in ['AC[kWh]','Cell_Temperature']:
-    for i,n in zip([df_open, df_close],['Open','Close']):
-        df_des[n+':'+j]=i[j].describe()
+# #%%
+# df_close = pd.read_csv('./result/df_result_close_sandia.csv', index_col=0)
+# df_open = pd.read_csv('./result/df_result_open_sandia.csv', index_col=0)
+# df_delta = df_close[['AC[kWh]', 'Tilt', 'Az']]
+# df_delta['AC[kWh]'] = df_open['AC[kWh]'] - df_close['AC[kWh]']
+# df_delta['Cell_Temperature'] = df_close['Cell_Temperature'] - df_open['Cell_Temperature']
+# #%% 그래프
+# df_des = pd.DataFrame()
+# for j in ['AC[kWh]','Cell_Temperature']:
+#     for i,n in zip([df_open, df_close],['Open','Close']):
+#         df_des[n+':'+j]=i[j].describe()
 
