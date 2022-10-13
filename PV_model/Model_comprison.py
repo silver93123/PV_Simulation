@@ -40,7 +40,9 @@ def PolarGraph(df_result,col_l,range_tilt,range_az,n_interval,  ):
         zi, z0 = np.reshape(ir, (len(range_az), len(range_tilt))).T, np.zeros((len(range_tilt), len(range_az)))
         ax = plt.subplot(1, len(col_l), i + 1, polar=True)
         cax_color_2 = ax.contourf(ti, ri, z0, cmap='Spectral_r', levels=np.linspace(c_min[i], c_max[i], n_interval))
-
+        cax_line = ax.contour(ti, ri, zi, levels=np.linspace(c_min[i], c_max[i], n_interval), linewidths=0.5,
+                              colors='k')
+        cax_color = ax.contourf(ti, ri, zi, cmap='Spectral_r', levels=np.linspace(c_min[i], c_max[i], n_interval))
         cb = plt.colorbar(cax_color_2, orientation='vertical', shrink=0.5)
         cb.set_label(col, labelpad=10, y=0.5, rotation=90)
         ax.set_title(label=(col))
@@ -128,7 +130,6 @@ result_pv_ac[result_pv_ac < 0] = 0
 result_pv_ac_sum = result_pv_ac.sum(axis=1)
 
 #%% #결과 요약
-
 result_pv_ac_sum_h = result_pv_ac_sum.resample('H').sum()
 Area_pv = modules_per_string*PV_selected['A_c']
 df_result_sum = pd.DataFrame()
@@ -148,9 +149,11 @@ for j in range(len(arrays)):
         'StartTime': [round(inverter_capacity / 1000, 2)],
     }
     df_result_sum = pd.concat([df_result_sum,pd.DataFrame(result_sum)])
+
 #%% 그래프
 col_l = ['AC[kWh]','Cell_Temperature']
 n_interval = 10
+
 PolarGraph(df_result_sum, col_l,range_tilt, range_az, n_interval)
 
 # #%%

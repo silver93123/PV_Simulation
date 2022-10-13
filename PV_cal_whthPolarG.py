@@ -25,8 +25,8 @@ df_weather.index = times_s
 weather_KSES = df_weather[['ghi', 'dni', 'dhi', 'wind_speed','temp_air']]
 
 #%% PV 시뮬레이션 조건 ('Noene'은 기본값)
-range_az =  np.linspace(0,360,19)
-range_tilt = np.linspace(0,90,10)
+range_az =  np.linspace(0,360,13)
+range_tilt = np.linspace(0,90,4)
 module_height, PVArea = 1, 10
 temperature_model_parameters = TMP['sapm']['open_rack_glass_polymer']          #후면조건[개방: 'freestanding',부착: 'insulated']
 module_type = 'glass_glass'
@@ -38,7 +38,6 @@ inverter_selected, inverter_capacity = model.find_inverter(PV_selected, strings,
 albedo, surface_type, array_losses_parameters = None, None, None
 
 #%% 어레이 구성부
-
 arrays = []
 for a in range_az:
     for t in range_tilt:
@@ -99,3 +98,30 @@ for j in range(len(arrays)):
         'StartTime': [round(inverter_capacity / 1000, 2)],
     }
     df_result_sum = pd.concat([df_result_sum,pd.DataFrame(result_sum)])
+
+#%% #결과 요약
+result_pv_ac_sum_h = result_pv_ac_sum.resample('H').sum()
+Area_pv = modules_per_string*PV_selected['A_c']
+df_result_sum = pd.DataFrame()
+for j in range(len(arrays)):
+    dc = result_pv_l[j].results.dc['p_mp'].resample('H').sum()
+    ac = result_pv_ac[j].resample('H').sum()
+    name = f'{arrays[j].name}'
+    result_sum = {
+        'Array' : [name],
+        'Tilt': [arrays[j].mount.surface_tilt],
+        'Az': [arrays[j].mount.surface_azimuth],
+        'Area[㎡]':[round(Area_pv,2)],
+        'AC[kWh]': [round(ac.sum() / 1000,2)],
+        'DC[kWh]': [round(dc.sum() / 1000,2)],
+        'Module_Capacity[kW]': [round(inverter_capacity/1000,2)],
+        'Cell_Temperature': [round(result_pv_l[j].results.cell_temperature.mean(), 2)],
+        'StartTime': [round(inverter_capacity / 1000, 2)],
+    }
+    df_result_sum = pd.concat([df_result_sum,pd.DataFrame(result_sum)])
+
+#%% 그래프
+col_l = ['DC[kWh]', 'AC[kWh]','Cell_Temperature']
+n_interval = 10
+
+model.PolarGraph(df_result_sum, col_l, range_tilt, range_az, n_interval)
